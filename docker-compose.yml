@@ -1,0 +1,47 @@
+version: "3.8"
+
+services:
+  orchestrator:
+    build: ./services/orchestrator
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./services/orchestrator:/app
+      - /app/node_modules
+    environment:
+      - NODE_ENV=development
+    command: npm run dev
+    depends_on:
+      - postgres
+
+  customer-dashboard:
+    build: ./apps/customer-dashboard
+    ports:
+      - "3002:3000"
+    volumes:
+      - ./apps/customer-dashboard:/app
+      - /app/node_modules
+    environment:
+      - NODE_ENV=development
+    command: npm run dev
+
+  postgres:
+    image: postgres:16-alpine
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: cloudmine
+      POSTGRES_PASSWORD: cloudmine
+      POSTGRES_DB: cloudmine
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  testnet:
+    build: ./tools/testnet
+    ports:
+      - "8545:8545"
+    profiles:
+      - testnet
+
+volumes:
+  postgres_data:

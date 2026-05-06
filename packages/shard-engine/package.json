@@ -1,0 +1,11 @@
+{
+  "name": "@cloudmine/shard-engine",
+  "version": "0.0.1",
+  "description": "CloudMine Shard Engine - C++23 with WASM via Emscripten",
+  "main": "dist/shard-engine.js",
+  "scripts": {
+    "build": "command -v em++ >/dev/null 2>&1 && (cmake -B build -DCMAKE_TOOLCHAIN_FILE=./emscripten-toolchain.cmake && cmake --build build) || echo 'Emscripten not installed, skipping WASM build'",
+    "clean": "rm -rf build dist"
+  },
+  "files": ["dist/*.wasm", "dist/*.js"]
+}

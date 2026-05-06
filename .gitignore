@@ -1,0 +1,55 @@
+# Dependencies
+node_modules/
+.npm/
+
+# Build outputs
+dist/
+build/
+.next/
+.turbo/
+
+# WASM / C++ build artifacts
+packages/shard-engine/build/
+packages/shard-engine/dist/
+*.wasm
+*.js.map
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+lerna-debug.log*
+
+# Environment
+.env
+..env.*
+!.env.example
+
+# Testing
+coverage/
+.nyc_output/
+
+# Android (miner-app)
+apps/miner-app/android/.gradle/
+apps/miner-app/android/app/build/
+apps/miner-app/android/build/
+
+# iOS (miner-app)
+apps/miner-app/ios/build/
+apps/miner-app/ios/Pods/
+
+# Misc
+*.tgz
+.nvmrc
+# Build prompt files (keep local only for reference)
+CLOUDMINE_BUILD_PROMPT.md
+POOT_BUILD_PROMPT.md
