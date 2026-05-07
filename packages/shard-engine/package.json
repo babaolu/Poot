@@ -4,8 +4,10 @@
   "description": "CloudMine Shard Engine - C++23 with WASM via Emscripten",
   "main": "dist/shard-engine.js",
   "scripts": {
-    "build": "command -v em++ >/dev/null 2>&1 && (cmake -B build -DCMAKE_TOOLCHAIN_FILE=./emscripten-toolchain.cmake && cmake --build build) || echo 'Emscripten not installed, skipping WASM build'",
-    "clean": "rm -rf build dist"
+    "build": "cmake -B build -DCMAKE_TOOLCHAIN_FILE=./emscripten-toolchain.cmake && cmake --build build",
+    "build:native": "cmake -B build-native && cmake --build build-native",
+    "test": "cd build-native && ctest --output-on-failure",
+    "clean": "rm -rf build build-native dist"
   },
   "files": ["dist/*.wasm", "dist/*.js"]
 }
