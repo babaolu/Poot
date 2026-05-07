@@ -1,4 +1,4 @@
-// orchestrator.hpp — Core orchestrator logic for CloudMine
+// orchestrator.hpp — Core orchestrator logic for Poot
 // C++23 — adheres to CppCoreGuidelines
 
 #pragma once
@@ -12,7 +12,7 @@
 #include <string>
 #include <vector>
 
-namespace CloudMine::Orchestrator {
+namespace Poot::Orchestrator {
 
 class Orchestrator {
 public:
@@ -302,4 +302,4 @@ private:
     std::mt19937 rng_;
 };
 
-} // namespace CloudMine::Orchestrator
+} // namespace Poot::Orchestrator

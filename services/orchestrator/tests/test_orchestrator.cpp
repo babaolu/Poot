@@ -1,4 +1,4 @@
-// test_orchestrator.cpp — Unit tests for CloudMine Orchestrator
+// test_orchestrator.cpp — Unit tests for Poot Orchestrator
 // C++23 — adheres to CppCoreGuidelines
 
 #include <catch2/catch_test_macros.hpp>
@@ -9,7 +9,7 @@
 
 #include "orchestrator/orchestrator.hpp"
 
-using namespace CloudMine::Orchestrator;
+using namespace Poot::Orchestrator;
 
 TEST_CASE("Register a miner", "[orchestrator][register]") {
     Orchestrator orch;

@@ -1,4 +1,4 @@
-// shard.cpp — C-style API for CloudMine Shard Engine
+// shard.cpp — C-style API for Poot Shard Engine
 // C++23 — adheres to CppCoreGuidelines
 // Provides C-linkage entry points for WASM and native interop
 
@@ -9,7 +9,7 @@
 
 #include "shard_engine/shard.hpp"
 
-using namespace CloudMine::ShardEngine;
+using namespace Poot::ShardEngine;
 
 // Opaque handle types
 struct ShardHandle {

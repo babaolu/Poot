@@ -12,7 +12,7 @@
 
 #include "crypto.hpp"
 
-namespace CloudMine::ShardEngine::Merkle {
+namespace Poot::ShardEngine::Merkle {
 
 // Direction of a hash in the proof: LEFT or RIGHT child
 enum class Direction : uint8_t { LEFT, RIGHT };
@@ -164,4 +164,4 @@ private:
     std::vector<uint8_t> root_hash_;
 };
 
-} // namespace CloudMine::ShardEngine::Merkle
+} // namespace Poot::ShardEngine::Merkle

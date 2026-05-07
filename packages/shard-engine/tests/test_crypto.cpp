@@ -9,7 +9,7 @@
 
 #include "shard_engine/crypto.hpp"
 
-using namespace CloudMine::ShardEngine::Crypto;
+using namespace Poot::ShardEngine::Crypto;
 
 TEST_CASE("SHA-256 empty string", "[crypto][sha256]") {
     std::vector<uint8_t> data = {};

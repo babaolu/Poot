@@ -1,5 +1,5 @@
 {
-  "name": "@cloudmine/shard-engine",
+  "name": "@poot/shard-engine",
   "version": "0.0.1",
   "description": "CloudMine Shard Engine - C++23 with WASM via Emscripten",
   "main": "dist/shard-engine.js",

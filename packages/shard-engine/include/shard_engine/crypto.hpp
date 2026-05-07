@@ -18,7 +18,7 @@
 #include <openssl/sha.h>
 #include <openssl/rand.h>
 
-namespace CloudMine::ShardEngine::Crypto {
+namespace Poot::ShardEngine::Crypto {
 
 // SHA-256: returns 32-byte hash
 [[nodiscard]] inline auto sha256(std::span<const uint8_t> data)
@@ -223,4 +223,4 @@ inline void random_bytes(std::span<uint8_t> buffer) {
     }
 }
 
-} // namespace CloudMine::ShardEngine::Crypto
+} // namespace Poot::ShardEngine::Crypto

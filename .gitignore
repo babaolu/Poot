@@ -10,6 +10,7 @@ build/
 
 # WASM / C++ build artifacts
 packages/shard-engine/build/
+packages/shard-engine/build-native/
 packages/shard-engine/dist/
 *.wasm
 *.js.map

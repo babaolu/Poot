@@ -1,4 +1,4 @@
-# Emscripten toolchain file for CloudMine Shard Engine
+# Emscripten toolchain file for Poot Shard Engine
 # Update the path below to point to your Emscripten installation
 # Example: /home/user/emsdk/upstream/emscripten/cmake/Modules/Platform/Emscripten.cmake
 

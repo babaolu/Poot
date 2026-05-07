@@ -1,10 +1,10 @@
-# CloudMine
+# Poot
 
 A decentralized physical infrastructure network (DePIN) that bridges mobile miners with cloud customers through a demand-gated token economy.
 
-## What is CloudMine?
+## What is Poot?
 
-CloudMine is a platform with two faces:
+Poot is a platform with two faces:
 
 - **Miners** use a mobile app that looks like a crypto mining app. In reality, it lends the phone's residual CPU, RAM, and storage to a distributed network.
 - **Customers** get a standard cloud hosting dashboard — deploy websites, run server instances, store files — at a fraction of AWS/GCP prices.
@@ -22,7 +22,7 @@ The bridge: tokens are only minted when real customer instances actively consume
 ## Architecture
 
 ```
-cloudmine/
+poot/
 ├── packages/
 │   ├── shard-engine/          # C++23, compiled to WASM (Reed-Solomon + AES-256-GCM)
 │   ├── proof-system/          # PoS + PoC challenge/response logic

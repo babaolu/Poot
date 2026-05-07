@@ -1,4 +1,4 @@
-// server.cpp — HTTP API server for CloudMine Orchestrator
+// server.cpp — HTTP API server for Poot Orchestrator
 // C++23 — adheres to CppCoreGuidelines
 
 #include "orchestrator/orchestrator.hpp"
@@ -19,7 +19,7 @@
 // We'll define a minimal HTTP server inline if cpp-httplib is not available.
 // For now, we'll implement a socket-based HTTP server.
 
-namespace CloudMine::Orchestrator {
+namespace Poot::Orchestrator {
 
 // Simple HTTP request parser
 struct HttpRequest {
@@ -171,7 +171,7 @@ public:
             return false;
         }
 
-        std::cout << "CloudMine Orchestrator listening on port " << port_ << std::endl;
+        std::cout << "Poot Orchestrator listening on port " << port_ << std::endl;
 
         while (running_) {
             fd_set readfds;
@@ -309,7 +309,7 @@ private:
     Orchestrator orchestrator_;
 };
 
-} // namespace CloudMine::Orchestrator
+} // namespace Poot::Orchestrator
 
 // Main entry point
 int main(int argc, char* argv[]) {
@@ -318,7 +318,7 @@ int main(int argc, char* argv[]) {
         port = std::atoi(argv[1]);
     }
 
-    CloudMine::Orchestrator::OrchestratorServer server(port);
+    Poot::Orchestrator::OrchestratorServer server(port);
     server.run();
     return 0;
 }

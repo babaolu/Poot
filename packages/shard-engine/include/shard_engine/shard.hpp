@@ -1,4 +1,4 @@
-// shard.hpp — Public API for CloudMine Shard Engine
+// shard.hpp — Public API for Poot Shard Engine
 // C++23 — adheres to CppCoreGuidelines
 #pragma once
 
@@ -13,7 +13,7 @@
 #include "crypto.hpp"
 #include "merkle.hpp"
 
-namespace CloudMine::ShardEngine {
+namespace Poot::ShardEngine {
 
 // Represents one encrypted shard ready for storage on a miner
 struct Shard {
@@ -452,4 +452,4 @@ inline auto reconstruct_and_verify(
     return reconstructed;
 }
 
-} // namespace CloudMine::ShardEngine
+} // namespace Poot::ShardEngine

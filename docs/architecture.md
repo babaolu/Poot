@@ -1,8 +1,8 @@
-# CloudMine Architecture
+# Poot Architecture
 
 ## Overview
 
-CloudMine is a decentralized physical infrastructure network (DePIN) that bridges mobile miners with cloud customers.
+Poot is a decentralized physical infrastructure network (DePIN) that bridges mobile miners with cloud customers.
 
 ## Components
 

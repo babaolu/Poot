@@ -1,4 +1,4 @@
-// models.hpp — Data models for CloudMine Orchestrator
+// models.hpp — Data models for Poot Orchestrator
 // C++23 — adheres to CppCoreGuidelines
 
 #pragma once
@@ -9,7 +9,7 @@
 #include <vector>
 #include <optional>
 
-namespace CloudMine::Orchestrator {
+namespace Poot::Orchestrator {
 
 // Miner status
 enum class MinerStatus {
@@ -99,4 +99,4 @@ struct DeploymentResult {
     std::string error_message;
 };
 
-} // namespace CloudMine::Orchestrator
+} // namespace Poot::Orchestrator

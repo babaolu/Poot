@@ -8,7 +8,7 @@
 
 #include "shard_engine/merkle.hpp"
 
-using namespace CloudMine::ShardEngine::Merkle;
+using namespace Poot::ShardEngine::Merkle;
 
 TEST_CASE("Merkle tree with 1 shard", "[merkle]") {
     std::vector<std::vector<uint8_t>> shards = {

@@ -1,4 +1,4 @@
-// bindings.cpp — Emscripten JS bindings for CloudMine Shard Engine
+// bindings.cpp — Emscripten JS bindings for Poot Shard Engine
 // C++23 — adheres to CppCoreGuidelines
 
 #include <emscripten/bind.h>
@@ -9,7 +9,7 @@
 #include "shard_engine/shard.hpp"
 
 using namespace emscripten;
-using namespace CloudMine::ShardEngine;
+using namespace Poot::ShardEngine;
 
 // Wrapper: split_and_encrypt returns a JS object
 // The caller provides data as Uint8Array, gets back {shards, manifest_json}

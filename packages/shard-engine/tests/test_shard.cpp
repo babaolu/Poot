@@ -10,7 +10,7 @@
 
 #include "shard_engine/shard.hpp"
 
-using namespace CloudMine::ShardEngine;
+using namespace Poot::ShardEngine;
 
 TEST_CASE("split_and_encrypt produces correct number of shards", "[shard][integration]") {
     std::vector<uint8_t> data(1000, 0);

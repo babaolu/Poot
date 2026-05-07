@@ -9,7 +9,7 @@
 
 #include "shard_engine/reed_solomon.hpp"
 
-using namespace CloudMine::ShardEngine;
+using namespace Poot::ShardEngine;
 
 TEST_CASE("GF256 multiply is commutative", "[gf256]") {
     for (int a = 1; a < 256; ++a) {

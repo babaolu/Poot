@@ -1,8 +1,8 @@
-# CloudMine Tokenomics
+# Poot Tokenomics
 
 ## Token Overview
 
-CloudMine token is demand-gated — minted only when customer instances actively consume miner resources.
+Poot token is demand-gated — minted only when customer instances actively consume miner resources.
 
 ## Minting Formula
 
