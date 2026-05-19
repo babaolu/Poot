@@ -30,7 +30,7 @@ poot/
 │   └── shared-types/          # TypeScript types shared across services
 │
 ├── services/
-│   ├── orchestrator/          # Miner registry, shard routing, re-replication (Fastify)
+│   ├── orchestrator/          # Miner registry, shard routing, re-replication (C++23, custom HTTP)
 │   ├── token-ledger/          # Off-chain ledger (Phase 2), on-chain bridge (Phase 4)
 │   ├── instance-runner/       # Customer deployment pipeline
 │   └── edge-proxy/           # Public HTTP edge, CDN, domain routing
@@ -54,7 +54,7 @@ poot/
 |---|---|
 | Shard engine | C++23 → WASM (Emscripten) |
 | Miner app | React Native (Android primary) |
-| Orchestrator | Node.js + TypeScript + Fastify |
+| Orchestrator | C++23 (custom HTTP, libpq persistence) |
 | Customer dashboard | Next.js + TailwindCSS |
 | Database | PostgreSQL + TimescaleDB |
 | Peer networking | libp2p |
@@ -76,14 +76,20 @@ poot/
 # Install dependencies
 npm install
 
-# Build all packages
+# Build all TypeScript packages
 npm run build
+
+# Build the C++ orchestrator binary
+cd services/orchestrator && cmake -B build-native && cmake --build build-native
 
 # Run linter
 npm run lint
 
-# Start development (specific service)
+# Start development (TypeScript stub — health-check only, port 3000)
 cd services/orchestrator && npm run dev
+
+# Start orchestrator C++ server (real API, port 8080 inside container → 3000 host)
+cd services/orchestrator && ./build-native/orchestrator-server
 ```
 
 ## License
