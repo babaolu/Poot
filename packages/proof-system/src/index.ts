@@ -1,1 +1,1 @@
-// CloudMine Proof System\nexport * from "@cloudmine/shared-types";
+// CloudMine Proof System\nexport * from "@poot/shared-types";

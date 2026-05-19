@@ -4,13 +4,15 @@ services:
   orchestrator:
     build: ./services/orchestrator
     ports:
-      - "3000:3000"
+      - "3000:8080"
     volumes:
       - ./services/orchestrator:/app
       - /app/node_modules
+      - /app/build-native
     environment:
       - NODE_ENV=development
-    command: npm run dev
+      - DATABASE_URL=host=postgres user=cloudmine password=cloudmine dbname=cloudmine
+    command: /app/build-native/orchestrator-server
     depends_on:
       - postgres
 
@@ -35,13 +37,6 @@ services:
       POSTGRES_DB: cloudmine
     volumes:
       - postgres_data:/var/lib/postgresql/data
-
-  testnet:
-    build: ./tools/testnet
-    ports:
-      - "8545:8545"
-    profiles:
-      - testnet
 
 volumes:
   postgres_data:

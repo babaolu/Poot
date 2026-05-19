@@ -1,0 +1,9 @@
+# Phase 1D testnet runner — do NOT commit large binaries here.
+# Populated at runtime by the runner script and Docker volumes.
+/test_data/
+/test_data/miner-*/
+
+# Per-run artefacts
+fail_reason.txt
+test_result.txt
+test_data/

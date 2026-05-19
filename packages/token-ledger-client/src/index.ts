@@ -1,1 +1,1 @@
-// CloudMine Token Ledger Client\nexport * from "@cloudmine/shared-types";
+// CloudMine Token Ledger Client\nexport * from "@poot/shared-types";

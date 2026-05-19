@@ -189,7 +189,7 @@ CMAKE_AR:FILEPATH=/usr/bin/ar
 
 //Choose the type of build, options are: None Debug Release RelWithDebInfo
 // MinSizeRel ...
-CMAKE_BUILD_TYPE:STRING=
+CMAKE_BUILD_TYPE:STRING=Release
 
 //Enable/Disable color output during build.
 CMAKE_COLOR_MAKEFILE:BOOL=ON
@@ -453,6 +453,12 @@ FETCHCONTENT_UPDATES_DISCONNECTED_CATCH2:BOOL=OFF
 
 //Git command line client
 GIT_EXECUTABLE:FILEPATH=/usr/bin/git
+
+//Arguments to supply to pkg-config
+PKG_CONFIG_ARGN:STRING=
+
+//pkg-config executable
+PKG_CONFIG_EXECUTABLE:FILEPATH=/usr/bin/pkg-config
 
 //Value Computed by CMake
 orchestrator_BINARY_DIR:STATIC=/home/itunz/Work/AI_work/Poot/services/orchestrator/build-native
@@ -735,10 +741,41 @@ CMAKE_VERBOSE_MAKEFILE-ADVANCED:INTERNAL=1
 Catch2WithMain_GUID_CMAKE:INTERNAL=8bd3552a-2cfb-4a59-ab15-2031b97ada1e
 //Project GUID
 Catch2_GUID_CMAKE:INTERNAL=8d538cbe-01bf-4a2e-a98a-6c368fdf13d7
+//Details about finding PkgConfig
+FIND_PACKAGE_MESSAGE_DETAILS_PkgConfig:INTERNAL=[/usr/bin/pkg-config][v1.8.1()]
 //ADVANCED property for variable: GIT_EXECUTABLE
 GIT_EXECUTABLE-ADVANCED:INTERNAL=1
 //Test HAVE_FLAG__ffile_prefix_map__home_itunz_Work_AI_work_Poot_services_orchestrator_build_native__deps_catch2_src__
 HAVE_FLAG__ffile_prefix_map__home_itunz_Work_AI_work_Poot_services_orchestrator_build_native__deps_catch2_src__:INTERNAL=1
+//ADVANCED property for variable: PKG_CONFIG_ARGN
+PKG_CONFIG_ARGN-ADVANCED:INTERNAL=1
+//ADVANCED property for variable: PKG_CONFIG_EXECUTABLE
+PKG_CONFIG_EXECUTABLE-ADVANCED:INTERNAL=1
+PQ_CFLAGS:INTERNAL=
+PQ_CFLAGS_I:INTERNAL=
+PQ_CFLAGS_OTHER:INTERNAL=
+PQ_FOUND:INTERNAL=
+PQ_INCLUDEDIR:INTERNAL=
+PQ_LIBDIR:INTERNAL=
+PQ_LIBS:INTERNAL=
+PQ_LIBS_L:INTERNAL=
+PQ_LIBS_OTHER:INTERNAL=
+PQ_LIBS_PATHS:INTERNAL=
+PQ_MODULE_NAME:INTERNAL=
+PQ_PREFIX:INTERNAL=
+PQ_STATIC_CFLAGS:INTERNAL=
+PQ_STATIC_CFLAGS_I:INTERNAL=
+PQ_STATIC_CFLAGS_OTHER:INTERNAL=
+PQ_STATIC_LIBDIR:INTERNAL=
+PQ_STATIC_LIBS:INTERNAL=
+PQ_STATIC_LIBS_L:INTERNAL=
+PQ_STATIC_LIBS_OTHER:INTERNAL=
+PQ_STATIC_LIBS_PATHS:INTERNAL=
+PQ_VERSION:INTERNAL=
+PQ_libpq_INCLUDEDIR:INTERNAL=
+PQ_libpq_LIBDIR:INTERNAL=
+PQ_libpq_PREFIX:INTERNAL=
+PQ_libpq_VERSION:INTERNAL=
 //linker supports push/pop state
 _CMAKE_LINKER_PUSHPOP_STATE_SUPPORTED:INTERNAL=TRUE
 //CMAKE_INSTALL_PREFIX during last run

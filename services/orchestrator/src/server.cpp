@@ -2,6 +2,7 @@
 // C++23 — adheres to CppCoreGuidelines
 
 #include "orchestrator/orchestrator.hpp"
+#include "orchestrator/postgres_store.hpp"
 #include <chrono>
 #include <cstdint>
 #include <cstring>
@@ -171,7 +172,38 @@ public:
             return false;
         }
 
+        // Small pause to avoid a predictable early-connect failure to Postgres
+        std::this_thread::sleep_for(std::chrono::seconds(1));
+
         std::cout << "Poot Orchestrator listening on port " << port_ << std::endl;
+
+        // ── Optional Postgres persistence ──────────────────────────────────
+        {
+            const char* db_url = std::getenv("DATABASE_URL");
+            if (db_url && *db_url) {
+                auto conn_result = pg_store_.connect(db_url);
+                if (!conn_result) {
+                    std::cerr << "WARNING: Postgres connection failed: "
+                              << conn_result.error()
+                              << "\nWARNING: Running WITHOUT persistence.\n";
+                } else {
+                    // Best-effort: hydrate from DB if tables exist
+                    if (auto miners = pg_store_.load_miners()) {
+                        for (const auto& m : *miners) {
+                            auto r = orchestrator_.register_miner(m);
+                            if (!r) std::cerr << "Hydrate skip (re-register) " << m.id << "\n";
+                        }
+                        std::cout << "Postgres connected — hydrated " << miners->size()
+                                  << " miners from DB.\n";
+                    } else {
+                        std::cout << "Postgres connected — min  table not yet created "
+                                     "(run schema script).\n";
+                    }
+                }
+            } else {
+                std::cout << "DATABASE_URL not set — running without persistence.\n";
+            }
+        }
 
         while (running_) {
             fd_set readfds;
@@ -243,6 +275,9 @@ private:
                 auto result = orchestrator_.register_miner(m);
                 if (result.has_value()) {
                     resp.body = "{\"id\":\"" + m.id + "\",\"status\":\"registered\"}";
+                    if (auto pr = pg_store_.insert_miner(m); !pr) {
+                        std::cerr << "Postgres insert_miner failed: " << pr.error() << "\n";
+                    }
                 } else {
                     resp = HttpResponse{400, "Bad Request", "{\"error\":\"" + result.error() + "\"}"};
                 }
@@ -266,6 +301,11 @@ private:
                 auto result = orchestrator_.handle_heartbeat(hb);
                 if (result.has_value()) {
                     resp.body = "{\"accepted\":true}";
+                    if (auto upd_m = orchestrator_.get_miner(hb.miner_id)) {
+                        if (auto pr = pg_store_.update_miner(upd_m->get()); !pr) {
+                            std::cerr << "Postgres update_miner failed: " << pr.error() << "\n";
+                        }
+                    }
                 } else {
                     resp = HttpResponse{404, "Not Found", "{\"error\":\"" + result.error() + "\"}"};
                 }
@@ -307,6 +347,7 @@ private:
     int port_;
     bool running_ = true;
     Orchestrator orchestrator_;
+    PostgresStore pg_store_;   // Optional persistence layer
 };
 
 } // namespace Poot::Orchestrator
