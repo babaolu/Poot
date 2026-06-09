@@ -17,7 +17,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 WORKDIR /app
 
 # Copy only CMake sources first for cache efficiency
-COPY CMakeLists.txt include/ src/ tests/ ./
+COPY CMakeLists.txt ./
+COPY include/ ./include/
+COPY src/ ./src/
+COPY tests/ ./tests/
 
 RUN cmake -B build-native -DCMAKE_BUILD_TYPE=Release \
   && cmake --build build-native --parallel
