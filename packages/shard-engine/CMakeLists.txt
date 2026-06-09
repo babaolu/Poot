@@ -2,7 +2,7 @@
 # C++23 — adheres to CppCoreGuidelines
 # Builds: static library (native), WASM binary (Emscripten), and test executable
 
-cmake_minimum_required(VERSION 3.28)
+cmake_minimum_required(VERSION 3.25)
 project(shard-engine LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 23)

@@ -17,7 +17,7 @@ SKIP_START=false
 if ! $SKIP_START; then
     echo "=== Starting testnet stack ==="
     cd "$SCRIPT_DIR"
-    docker-compose up --build -d 2>&1
+    docker compose up --build -d 2>&1
     echo ""
 fi
 
@@ -30,10 +30,10 @@ rc=$?
 if [[ $rc -ne 0 ]]; then
     echo ""
     echo "FAIL — see ${SCRIPT_DIR}/fail_reason.txt"
-    echo "(containers left running for inspection — run 'docker-compose down' when done)"
+    echo "(containers left running for inspection — run 'docker compose down' when done)"
     exit $rc
 fi
 
 echo ""
-echo "All good.  Tear down with: cd tools/testnet && docker-compose down"
+echo "All good.  Tear down with: cd tools/testnet && docker compose down"
 exit 0

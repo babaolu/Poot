@@ -10,7 +10,7 @@ version: "3.8"
 
 services:
   orchestrator:
-    build: ./services/orchestrator
+    build: ../../services/orchestrator
     ports:
       - "3000:8080"
     environment:
@@ -33,7 +33,7 @@ services:
 
   # ── 10 simulated miners (generated from template) ───────────────────────
   miner-001: &miner-template
-    build: ./tools/testnet
+    build: .
     volumes:
       - ./test_data/miner-001:/shards:rw
     environment:
@@ -43,7 +43,8 @@ services:
     depends_on:
       - orchestrator
 
-  miner-002: *miner-template
+  miner-002:
+    <<: *miner-template
     volumes:
       - ./test_data/miner-002:/shards:rw
     environment:
@@ -51,7 +52,8 @@ services:
       ORCHESTRATOR_URL: http://orchestrator:8080
       MINER_PORT: "9100"
 
-  miner-003: *miner-template
+  miner-003:
+    <<: *miner-template
     volumes:
       - ./test_data/miner-003:/shards:rw
     environment:
@@ -59,7 +61,8 @@ services:
       ORCHESTRATOR_URL: http://orchestrator:8080
       MINER_PORT: "9100"
 
-  miner-004: *miner-template
+  miner-004:
+    <<: *miner-template
     volumes:
       - ./test_data/miner-004:/shards:rw
     environment:
@@ -67,7 +70,8 @@ services:
       ORCHESTRATOR_URL: http://orchestrator:8080
       MINER_PORT: "9100"
 
-  miner-005: *miner-template
+  miner-005:
+    <<: *miner-template
     volumes:
       - ./test_data/miner-005:/shards:rw
     environment:
@@ -75,7 +79,8 @@ services:
       ORCHESTRATOR_URL: http://orchestrator:8080
       MINER_PORT: "9100"
 
-  miner-006: *miner-template
+  miner-006:
+    <<: *miner-template
     volumes:
       - ./test_data/miner-006:/shards:rw
     environment:
@@ -83,7 +88,8 @@ services:
       ORCHESTRATOR_URL: http://orchestrator:8080
       MINER_PORT: "9100"
 
-  miner-007: *miner-template
+  miner-007:
+    <<: *miner-template
     volumes:
       - ./test_data/miner-007:/shards:rw
     environment:
@@ -91,7 +97,8 @@ services:
       ORCHESTRATOR_URL: http://orchestrator:8080
       MINER_PORT: "9100"
 
-  miner-008: *miner-template
+  miner-008:
+    <<: *miner-template
     volumes:
       - ./test_data/miner-008:/shards:rw
     environment:
@@ -99,7 +106,8 @@ services:
       ORCHESTRATOR_URL: http://orchestrator:8080
       MINER_PORT: "9100"
 
-  miner-009: *miner-template
+  miner-009:
+    <<: *miner-template
     volumes:
       - ./test_data/miner-009:/shards:rw
     environment:
@@ -107,7 +115,8 @@ services:
       ORCHESTRATOR_URL: http://orchestrator:8080
       MINER_PORT: "9100"
 
-  miner-010: *miner-template
+  miner-010:
+    <<: *miner-template
     volumes:
       - ./test_data/miner-010:/shards:rw
     environment:
