@@ -17,7 +17,12 @@ SKIP_START=false
 if ! $SKIP_START; then
     echo "=== Starting testnet stack ==="
     cd "$SCRIPT_DIR"
-    docker compose up --build -d 2>&1
+    echo "Building services sequentially..."
+    docker compose build postgres 2>&1
+    docker compose build orchestrator 2>&1
+    docker compose build miner-001 2>&1
+    echo "Starting stack..."
+    docker compose up -d 2>&1
     echo ""
 fi
 

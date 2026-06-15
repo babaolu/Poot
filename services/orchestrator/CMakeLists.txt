@@ -5,12 +5,17 @@ set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-# Dependencies
-include(FetchContent)
-FetchContent_Declare(catch2
-    GIT_REPOSITORY https://github.com/catchorg/Catch2.git
-    GIT_TAG v3.5.4)
-FetchContent_MakeAvailable(catch2)
+# Options
+option(BUILD_TESTS "Build test suite" ON)
+
+if(BUILD_TESTS)
+    # Dependencies
+    include(FetchContent)
+    FetchContent_Declare(catch2
+        GIT_REPOSITORY https://github.com/catchorg/Catch2.git
+        GIT_TAG v3.5.4)
+    FetchContent_MakeAvailable(catch2)
+endif()
 
 # PostgreSQL client library (libpq)
 find_package(PkgConfig REQUIRED)
@@ -34,12 +39,14 @@ target_include_directories(orchestrator-server PRIVATE include ${PQ_INCLUDE_DIRS
 target_link_libraries(orchestrator-server orchestrator-lib ${PQ_LIBRARIES})
 target_compile_options(orchestrator-server PRIVATE ${PQ_CFLAGS_OTHER})
 
-# Test executable
-add_executable(orchestrator-tests
-    tests/test_main.cpp
-    tests/test_orchestrator.cpp
-)
-target_link_libraries(orchestrator-tests orchestrator-lib Catch2::Catch2WithMain ${PQ_LIBRARIES})
+if(BUILD_TESTS)
+    # Test executable
+    add_executable(orchestrator-tests
+        tests/test_main.cpp
+        tests/test_orchestrator.cpp
+    )
+    target_link_libraries(orchestrator-tests orchestrator-lib Catch2::Catch2WithMain ${PQ_LIBRARIES})
 
-enable_testing()
-add_test(NAME orchestrator-tests COMMAND orchestrator-tests)
+    enable_testing()
+    add_test(NAME orchestrator-tests COMMAND orchestrator-tests)
+endif()

@@ -86,9 +86,9 @@ def _gauss_jordan(mat: list[list[int]]) -> list[list[int]]:
         if pivot != col:
             aug[col], aug[pivot] = aug[pivot], aug[col]
 
-        inv = _LOG[aug[col][col]]  # invert pivot
+        pivot_val = aug[col][col]
         # Scale pivot row
-        aug[col] = [_gf_mul(v, inv) for v in aug[col]]
+        aug[col] = [_gf_div(v, pivot_val) for v in aug[col]]
 
         for r in range(n):
             if r == col:

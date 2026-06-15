@@ -245,7 +245,9 @@ private:
         }
 
         HttpResponse resp;
-        if (req.method == "GET" && req.path == "/miners") {
+        if (req.method == "GET" && req.path == "/health") {
+            resp.body = "{\"status\":\"healthy\"}";
+        } else if (req.method == "GET" && req.path == "/miners") {
             auto ids = orchestrator_.list_miners();
             resp.body = json::to_json(ids);
         } else if (req.method == "GET" && req.path == "/miners/online") {

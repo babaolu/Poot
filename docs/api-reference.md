@@ -8,7 +8,17 @@ This document describes the HTTP API surface of the Poot Orchestrator.
 
 The miner API endpoints are implemented natively in the C++ custom HTTP server (`services/orchestrator/src/server.cpp`).
 
-### 1.1. List All Registered Miners
+### 1.1. Orchestrator Health Check
+* **Endpoint**: `GET /health`
+* **Description**: Returns the operational health status of the Orchestrator server.
+* **Response `200 OK`**:
+  ```json
+  {
+    "status": "healthy"
+  }
+  ```
+
+### 1.2. List All Registered Miners
 * **Endpoint**: `GET /miners`
 * **Description**: Returns a JSON array of all registered miner IDs in the network.
 * **Response `200 OK`**:
@@ -19,7 +29,7 @@ The miner API endpoints are implemented natively in the C++ custom HTTP server (
   ]
   ```
 
-### 1.2. List Online Miners Only
+### 1.3. List Online Miners Only
 * **Endpoint**: `GET /miners/online`
 * **Description**: Returns a JSON array of currently active and online miner IDs.
 * **Response `200 OK`**:
@@ -29,7 +39,7 @@ The miner API endpoints are implemented natively in the C++ custom HTTP server (
   ]
   ```
 
-### 1.3. Get Single Miner Details
+### 1.4. Get Single Miner Details
 * **Endpoint**: `GET /miner/:id`
 * **Description**: Returns detailed resource, battery, thermal, and network status for a specific miner.
 * **Response `200 OK`**:
@@ -55,7 +65,7 @@ The miner API endpoints are implemented natively in the C++ custom HTTP server (
   }
   ```
 
-### 1.4. Register a New Miner
+### 1.5. Register a New Miner
 * **Endpoint**: `POST /miner/register`
 * **Description**: Registers a new mobile miner node in the orchestrator registry.
 * **Payload**:
@@ -74,7 +84,7 @@ The miner API endpoints are implemented natively in the C++ custom HTTP server (
   }
   ```
 
-### 1.5. Miner Heartbeat
+### 1.6. Miner Heartbeat
 * **Endpoint**: `POST /heartbeat`
 * **Description**: Receives periodic status and resource updates from active miners.
 * **Payload**:
@@ -94,7 +104,7 @@ The miner API endpoints are implemented natively in the C++ custom HTTP server (
   }
   ```
 
-### 1.6. Check Offline Miners
+### 1.7. Check Offline Miners
 * **Endpoint**: `POST /check-offline`
 * **Description**: Manually triggers a stale heartbeat sweep, marking silent miners offline and returning their IDs.
 * **Response `200 OK`**:

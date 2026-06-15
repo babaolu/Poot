@@ -6,7 +6,10 @@
 #   ./run_testnet.sh               # starts stack + runs pipeline
 #   ./run_testnet.sh skip-start    # skip docker-compose up (already running)
 
-version: "3.8"
+x-miner-base: &miner-template
+  image: testnet-miner:latest
+  depends_on:
+    - orchestrator
 
 services:
   orchestrator:
@@ -15,7 +18,6 @@ services:
       - "3000:8080"
     environment:
       - DATABASE_URL=host=postgres user=cloudmine password=cloudmine dbname=cloudmine
-      - DATABASE_URL=host=postgres user=cloudmine password=cloudmine dbname=cloudmine
     command: /app/build-native/orchestrator-server
     depends_on:
       - postgres
@@ -23,7 +25,7 @@ services:
   postgres:
     image: postgres:16-alpine
     ports:
-      - "5432:5432"
+      - "54322:5432"
     environment:
       POSTGRES_USER: cloudmine
       POSTGRES_PASSWORD: cloudmine
@@ -32,21 +34,20 @@ services:
       - postgres_data:/var/lib/postgresql/data
 
   # ── 10 simulated miners (generated from template) ───────────────────────
-  miner-001: &miner-template
+  miner-001:
+    <<: *miner-template
     build: .
     volumes:
-      - ./test_data/miner-001:/shards:rw
+      - ./test_data/miner_001:/shards:rw
     environment:
       MINER_ID: miner-001
       ORCHESTRATOR_URL: http://orchestrator:8080
       MINER_PORT: "9100"
-    depends_on:
-      - orchestrator
 
   miner-002:
     <<: *miner-template
     volumes:
-      - ./test_data/miner-002:/shards:rw
+      - ./test_data/miner_002:/shards:rw
     environment:
       MINER_ID: miner-002
       ORCHESTRATOR_URL: http://orchestrator:8080
@@ -55,7 +56,7 @@ services:
   miner-003:
     <<: *miner-template
     volumes:
-      - ./test_data/miner-003:/shards:rw
+      - ./test_data/miner_003:/shards:rw
     environment:
       MINER_ID: miner-003
       ORCHESTRATOR_URL: http://orchestrator:8080
@@ -64,7 +65,7 @@ services:
   miner-004:
     <<: *miner-template
     volumes:
-      - ./test_data/miner-004:/shards:rw
+      - ./test_data/miner_004:/shards:rw
     environment:
       MINER_ID: miner-004
       ORCHESTRATOR_URL: http://orchestrator:8080
@@ -73,7 +74,7 @@ services:
   miner-005:
     <<: *miner-template
     volumes:
-      - ./test_data/miner-005:/shards:rw
+      - ./test_data/miner_005:/shards:rw
     environment:
       MINER_ID: miner-005
       ORCHESTRATOR_URL: http://orchestrator:8080
@@ -82,7 +83,7 @@ services:
   miner-006:
     <<: *miner-template
     volumes:
-      - ./test_data/miner-006:/shards:rw
+      - ./test_data/miner_006:/shards:rw
     environment:
       MINER_ID: miner-006
       ORCHESTRATOR_URL: http://orchestrator:8080
@@ -91,7 +92,7 @@ services:
   miner-007:
     <<: *miner-template
     volumes:
-      - ./test_data/miner-007:/shards:rw
+      - ./test_data/miner_007:/shards:rw
     environment:
       MINER_ID: miner-007
       ORCHESTRATOR_URL: http://orchestrator:8080
@@ -100,7 +101,7 @@ services:
   miner-008:
     <<: *miner-template
     volumes:
-      - ./test_data/miner-008:/shards:rw
+      - ./test_data/miner_008:/shards:rw
     environment:
       MINER_ID: miner-008
       ORCHESTRATOR_URL: http://orchestrator:8080
@@ -109,7 +110,7 @@ services:
   miner-009:
     <<: *miner-template
     volumes:
-      - ./test_data/miner-009:/shards:rw
+      - ./test_data/miner_009:/shards:rw
     environment:
       MINER_ID: miner-009
       ORCHESTRATOR_URL: http://orchestrator:8080
@@ -118,7 +119,7 @@ services:
   miner-010:
     <<: *miner-template
     volumes:
-      - ./test_data/miner-010:/shards:rw
+      - ./test_data/miner_010:/shards:rw
     environment:
       MINER_ID: miner-010
       ORCHESTRATOR_URL: http://orchestrator:8080

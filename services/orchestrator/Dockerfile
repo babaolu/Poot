@@ -22,7 +22,7 @@ COPY include/ ./include/
 COPY src/ ./src/
 COPY tests/ ./tests/
 
-RUN cmake -B build-native -DCMAKE_BUILD_TYPE=Release \
+RUN cmake -B build-native -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTS=OFF \
   && cmake --build build-native --parallel
 
 EXPOSE 8080
