@@ -4,7 +4,7 @@
   "description": "CloudMine Shard Engine - C++23 with WASM via Emscripten",
   "main": "dist/shard-engine.js",
   "scripts": {
-    "build": "cmake -B build -DCMAKE_TOOLCHAIN_FILE=./emscripten-toolchain.cmake && cmake --build build",
+    "build": "if command -v em++ >/dev/null 2>&1; then cmake -B build -DCMAKE_TOOLCHAIN_FILE=./emscripten-toolchain.cmake && cmake --build build; else echo 'WARNING: Emscripten (em++) not found. Skipping WASM build for shard-engine. Building native library instead...'; npm run build:native; fi",
     "build:native": "cmake -B build-native && cmake --build build-native",
     "test": "cd build-native && ctest --output-on-failure",
     "clean": "rm -rf build build-native dist"
