@@ -1,6 +1,3 @@
-// orchestrator.hpp — Core orchestrator logic for Poot
-// C++23 — adheres to CppCoreGuidelines
-
 #pragma once
 
 #include "models.hpp"
@@ -11,8 +8,18 @@
 #include <random>
 #include <string>
 #include <vector>
+#include <shared_mutex>
+#include <mutex>
+#include <optional>
 
 namespace Poot::Orchestrator {
+
+// Value wrapper to allow both value-based safety and .get() backward compatibility
+struct MinerValue {
+    Miner miner;
+    [[nodiscard]] const Miner& get() const noexcept { return miner; }
+    [[nodiscard]] const Miner* operator->() const noexcept { return &miner; }
+};
 
 class Orchestrator {
 public:
@@ -27,6 +34,7 @@ public:
         if (miner.id.empty()) {
             return std::unexpected("Miner ID cannot be empty");
         }
+        std::unique_lock lock(mutex_);
         if (miners_.contains(miner.id)) {
             return std::unexpected("Miner already registered: " + miner.id);
         }
@@ -37,13 +45,15 @@ public:
     }
 
     [[nodiscard]] auto get_miner(const std::string& id) const
-        -> std::optional<std::reference_wrapper<const Miner>> {
+        -> std::optional<MinerValue> {
+        std::shared_lock lock(mutex_);
         auto it = miners_.find(id);
         if (it == miners_.end()) return std::nullopt;
-        return std::cref(it->second);
+        return MinerValue{it->second};
     }
 
     [[nodiscard]] auto list_miners() const -> std::vector<std::string> {
+        std::shared_lock lock(mutex_);
         std::vector<std::string> ids;
         ids.reserve(miners_.size());
         for (const auto& [id, _] : miners_) {
@@ -53,6 +63,7 @@ public:
     }
 
     [[nodiscard]] auto list_online_miners() const -> std::vector<std::string> {
+        std::shared_lock lock(mutex_);
         std::vector<std::string> ids;
         for (const auto& [id, miner] : miners_) {
             if (miner.status == MinerStatus::Online) {
@@ -66,6 +77,7 @@ public:
 
     [[nodiscard]] auto handle_heartbeat(const HeartbeatRequest& req)
         -> std::expected<HeartbeatResponse, std::string> {
+        std::unique_lock lock(mutex_);
         auto it = miners_.find(req.miner_id);
         if (it == miners_.end()) {
             return std::unexpected("Unknown miner: " + req.miner_id);
@@ -113,7 +125,14 @@ public:
             return std::unexpected("No shards to assign");
         }
 
-        auto online = list_online_miners();
+        std::unique_lock lock(mutex_);
+        std::vector<std::string> online;
+        for (const auto& [id, miner] : miners_) {
+            if (miner.status == MinerStatus::Online) {
+                online.push_back(id);
+            }
+        }
+
         if (online.size() < replication_factor) {
             return std::unexpected("Not enough online miners. Need " +
                                    std::to_string(replication_factor) + ", have " +
@@ -126,7 +145,7 @@ public:
         for (const auto& shard_id : shard_ids) {
             // Select miners for this shard (round-robin + capacity filter)
             std::vector<std::string> selected;
-            select_miners(online, replication_factor, selected);
+            select_miners_locked(online, replication_factor, selected);
 
             for (const auto& miner_id : selected) {
                 ShardAssignment a;
@@ -160,6 +179,7 @@ public:
 
     [[nodiscard]] auto get_assignments_for_shard(const std::string& shard_id) const
         -> std::vector<ShardAssignment> {
+        std::shared_lock lock(mutex_);
         auto it = shard_assignments_.find(shard_id);
         if (it == shard_assignments_.end()) return {};
         return it->second;
@@ -167,6 +187,7 @@ public:
 
     [[nodiscard]] auto get_assignments_for_miner(const std::string& miner_id) const
         -> std::vector<ShardAssignment> {
+        std::shared_lock lock(mutex_);
         std::vector<ShardAssignment> result;
         for (const auto& [shard_id, assignments] : shard_assignments_) {
             for (const auto& a : assignments) {
@@ -182,6 +203,7 @@ public:
 
     [[nodiscard]] auto check_offline_miners(std::chrono::seconds timeout = std::chrono::seconds(120))
         -> std::vector<std::string> {
+        std::unique_lock lock(mutex_);
         auto now = Clock::now();
         std::vector<std::string> offline;
 
@@ -199,6 +221,7 @@ public:
 
     [[nodiscard]] auto trigger_rereplication(const std::string& offline_miner_id)
         -> std::expected<std::vector<ShardAssignment>, std::string> {
+        std::unique_lock lock(mutex_);
         auto it = miners_.find(offline_miner_id);
         if (it == miners_.end()) {
             return std::unexpected("Unknown miner: " + offline_miner_id);
@@ -235,14 +258,46 @@ public:
             shard_ids.push_back(a.shard_id);
         }
 
-        // For simplicity, use the first customer_id found
         std::string customer_id = lost_assignments[0].customer_id;
-        return assign_shards(customer_id, "repl-" + offline_miner_id, shard_ids, 3);
+        
+        std::vector<std::string> online;
+        for (const auto& [id, miner] : miners_) {
+            if (miner.status == MinerStatus::Online) {
+                online.push_back(id);
+            }
+        }
+
+        if (online.size() < 3) {
+            return std::unexpected("Not enough online miners for re-replication");
+        }
+
+        std::vector<ShardAssignment> new_assignments;
+        for (const auto& shard_id : shard_ids) {
+            std::vector<std::string> selected;
+            select_miners_locked(online, 3, selected);
+
+            for (const auto& miner_id : selected) {
+                ShardAssignment a;
+                a.shard_id = shard_id;
+                a.miner_id = miner_id;
+                a.customer_id = customer_id;
+                a.replication_factor = 3;
+                a.assigned_at = Clock::now();
+                a.verified = false;
+
+                new_assignments.push_back(a);
+                pending_shards_[miner_id].push_back(shard_id);
+            }
+            shard_assignments_[shard_id] = new_assignments;
+        }
+
+        return new_assignments;
     }
 
     // --- Stats ---
 
     [[nodiscard]] auto total_storage_available() const -> uint64_t {
+        std::shared_lock lock(mutex_);
         uint64_t total = 0;
         for (const auto& [_, m] : miners_) {
             if (m.status == MinerStatus::Online) {
@@ -253,6 +308,7 @@ public:
     }
 
     [[nodiscard]] auto total_storage_used() const -> uint64_t {
+        std::shared_lock lock(mutex_);
         uint64_t total = 0;
         for (const auto& [_, m] : miners_) {
             total += m.storage_bytes_used;
@@ -261,32 +317,34 @@ public:
     }
 
     [[nodiscard]] auto miner_count() const -> size_t {
+        std::shared_lock lock(mutex_);
         return miners_.size();
     }
 
     [[nodiscard]] auto online_miner_count() const -> size_t {
-        return list_online_miners().size();
+        std::shared_lock lock(mutex_);
+        size_t count = 0;
+        for (const auto& [_, m] : miners_) {
+            if (m.status == MinerStatus::Online) ++count;
+        }
+        return count;
     }
 
 private:
-    // Select miners based on capacity and reputation (simplified round-robin)
-    void select_miners(const std::vector<std::string>& online,
-                       size_t count,
-                       std::vector<std::string>& out) {
+    void select_miners_locked(const std::vector<std::string>& online,
+                              size_t count,
+                              std::vector<std::string>& out) {
         if (online.empty() || count == 0) return;
 
-        // Shuffle for basic distribution
         std::vector<std::string> candidates = online;
         std::shuffle(candidates.begin(), candidates.end(), rng_);
 
-        // Filter by capacity (must have at least 1MB free)
         std::erase_if(candidates, [&](const std::string& id) {
             auto it = miners_.find(id);
             if (it == miners_.end()) return true;
             return it->second.storage_bytes_available < 1024 * 1024;
         });
 
-        // Sort by reputation (higher is better)
         std::sort(candidates.begin(), candidates.end(), [&](const std::string& a, const std::string& b) {
             return miners_.at(a).reputation_score > miners_.at(b).reputation_score;
         });
@@ -296,6 +354,7 @@ private:
         }
     }
 
+    mutable std::shared_mutex mutex_;
     std::map<std::string, Miner> miners_;
     std::map<std::string, std::vector<ShardAssignment>> shard_assignments_;
     std::map<std::string, std::vector<std::string>> pending_shards_; // miner_id -> shard_ids

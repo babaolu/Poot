@@ -9,5 +9,8 @@
     "test": "cd build-native && ctest --output-on-failure",
     "clean": "rm -rf build build-native dist"
   },
-  "files": ["dist/*.wasm", "dist/*.js"]
+  "files": [
+    "dist/*.wasm",
+    "dist/*.js"
+  ]
 }

@@ -6,6 +6,7 @@
 #include <cstdint>
 #include <string>
 #include <vector>
+#include <thread>
 
 #include "orchestrator/orchestrator.hpp"
 
@@ -278,4 +279,51 @@ TEST_CASE("Get assignments for miner", "[orchestrator][assignments]") {
     // Check assignments for miner-001
     auto miner_assignments = orch.get_assignments_for_miner("miner-001");
     REQUIRE(!miner_assignments.empty());
+}
+
+TEST_CASE("Concurrent multi-threaded operations", "[orchestrator][concurrency][NFR-PERF-1]") {
+    Orchestrator orch;
+    const int num_threads = 32;
+    const int ops_per_thread = 50;
+
+    std::vector<std::thread> threads;
+    threads.reserve(num_threads);
+
+    for (int t = 0; t < num_threads; ++t) {
+        threads.emplace_back([&orch, t, ops_per_thread]() {
+            for (int i = 0; i < ops_per_thread; ++i) {
+                std::string miner_id = "miner-" + std::to_string(t) + "-" + std::to_string(i);
+                
+                // Register
+                Miner m;
+                m.id = miner_id;
+                m.status = MinerStatus::Online;
+                m.storage_bytes_available = 1024ull * 1024 * 50;
+                auto r = orch.register_miner(m);
+                (void)r;
+
+                // Query
+                auto q = orch.get_miner(miner_id);
+                (void)q;
+
+                // Heartbeat
+                HeartbeatRequest hb;
+                hb.miner_id = miner_id;
+                hb.battery_percent = 90;
+                hb.is_charging = true;
+                auto hbr = orch.handle_heartbeat(hb);
+                (void)hbr;
+
+                // List
+                auto list = orch.list_online_miners();
+                (void)list;
+            }
+        });
+    }
+
+    for (auto& th : threads) {
+        th.join();
+    }
+
+    REQUIRE(orch.miner_count() == static_cast<size_t>(num_threads * ops_per_thread));
 }

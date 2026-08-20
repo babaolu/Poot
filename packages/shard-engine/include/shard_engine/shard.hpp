@@ -33,7 +33,10 @@ struct Manifest {
     size_t data_shards = 6;
     size_t parity_shards = 3;
     std::vector<std::string> shard_hashes_b64; // SHA-256 of each shard (for integrity, Base64)
-    std::string encryption_iv_b64;         // Base64 IV used for encryption
+    std::vector<std::string> shard_ivs_b64;    // Base64 IV used for each shard (12 bytes each)
+    std::string wrapped_key_b64;               // Envelope-encrypted DEK (AES-256-GCM ciphertext, Base64)
+    std::string key_iv_b64;                    // IV for wrapped DEK (12 bytes, Base64)
+    std::string key_tag_b64;                   // Tag for wrapped DEK (16 bytes, Base64)
 
     // Serialize to JSON
     [[nodiscard]] auto to_json() const -> std::string;
@@ -42,25 +45,36 @@ struct Manifest {
     [[nodiscard]] static auto from_json(const std::string& json) -> std::expected<Manifest, std::string>;
 };
 
-// Split data into shards and encrypt each shard
+// Split data into shards and encrypt each shard with a unique random IV and envelope-encrypted DEK
 // Returns: (vector of Shards, Manifest)
 // Default: 6 data + 3 parity = 9 total shards; any 6 can reconstruct
 [[nodiscard]] auto split_and_encrypt(
     std::span<const uint8_t> data,
     size_t data_shards = 6,
-    size_t parity_shards = 3)
+    size_t parity_shards = 3,
+    std::span<const uint8_t> customer_kek = {})
     -> std::expected<std::pair<std::vector<Shard>, Manifest>, std::string>;
 
 // Given any `data_shards` shards, reconstruct and verify the original data
 // The shards can be any subset of the originals (as long as count >= data_shards)
 [[nodiscard]] auto reconstruct_and_verify(
     std::span<const Shard> shards,
-    const Manifest& manifest)
+    const Manifest& manifest,
+    std::span<const uint8_t> customer_kek = {})
     -> std::expected<std::vector<uint8_t>, std::string>;
 
 // --- Implementation ---
 
 namespace detail {
+
+// Default Key-Encryption-Key for envelope encryption when no custom customer_kek is supplied
+inline auto default_kek() -> std::array<uint8_t, 32> {
+    static constexpr std::string_view kSeed = "CloudMine_Envelope_Master_KEK_v1_Secret";
+    auto hash = Crypto::sha256(kSeed);
+    std::array<uint8_t, 32> key{};
+    std::copy_n(hash.begin(), 32, key.begin());
+    return key;
+}
 
 // Base64 encode/decode helpers (header-only, no external deps)
 [[nodiscard]] inline auto base64_encode(std::span<const uint8_t> data) -> std::string {
@@ -197,11 +211,19 @@ inline auto Manifest::to_json() const -> std::string {
     j += "\"shard_size\":" + std::to_string(shard_size) + ",";
     j += "\"data_shards\":" + std::to_string(data_shards) + ",";
     j += "\"parity_shards\":" + std::to_string(parity_shards) + ",";
-    j += "\"encryption_iv_b64\":\"" + json_escape(encryption_iv_b64) + "\",";
+    j += "\"wrapped_key_b64\":\"" + json_escape(wrapped_key_b64) + "\",";
+    j += "\"key_iv_b64\":\"" + json_escape(key_iv_b64) + "\",";
+    j += "\"key_tag_b64\":\"" + json_escape(key_tag_b64) + "\",";
     j += "\"shard_hashes_b64\":[";
     for (size_t i = 0; i < shard_hashes_b64.size(); ++i) {
         if (i > 0) j += ",";
         j += "\"" + json_escape(shard_hashes_b64[i]) + "\"";
+    }
+    j += "],";
+    j += "\"shard_ivs_b64\":[";
+    for (size_t i = 0; i < shard_ivs_b64.size(); ++i) {
+        if (i > 0) j += ",";
+        j += "\"" + json_escape(shard_ivs_b64[i]) + "\"";
     }
     j += "]}";
     return j;
@@ -265,16 +287,39 @@ inline auto Manifest::from_json(const std::string& json) -> std::expected<Manife
             auto val = json_parse_number(s);
             if (!val.has_value()) return std::unexpected("Failed to parse parity_shards");
             m.parity_shards = *val;
-        } else if (*key == "encryption_iv_b64") {
+        } else if (*key == "wrapped_key_b64") {
             skip_ws();
             auto val = json_parse_string(s);
-            if (!val.has_value()) return std::unexpected("Failed to parse encryption_iv_b64");
-            m.encryption_iv_b64 = *val;
+            if (!val.has_value()) return std::unexpected("Failed to parse wrapped_key_b64");
+            m.wrapped_key_b64 = *val;
+        } else if (*key == "key_iv_b64") {
+            skip_ws();
+            auto val = json_parse_string(s);
+            if (!val.has_value()) return std::unexpected("Failed to parse key_iv_b64");
+            m.key_iv_b64 = *val;
+        } else if (*key == "key_tag_b64") {
+            skip_ws();
+            auto val = json_parse_string(s);
+            if (!val.has_value()) return std::unexpected("Failed to parse key_tag_b64");
+            m.key_tag_b64 = *val;
         } else if (*key == "shard_hashes_b64") {
             skip_ws();
             auto val = json_parse_array(s);
             if (!val.has_value()) return std::unexpected("Failed to parse shard_hashes_b64");
             m.shard_hashes_b64 = *val;
+        } else if (*key == "shard_ivs_b64") {
+            skip_ws();
+            auto val = json_parse_array(s);
+            if (!val.has_value()) return std::unexpected("Failed to parse shard_ivs_b64");
+            m.shard_ivs_b64 = *val;
+        } else if (*key == "encryption_iv_b64") {
+            // Legacy / fallback support
+            skip_ws();
+            auto val = json_parse_string(s);
+            if (!val.has_value()) return std::unexpected("Failed to parse encryption_iv_b64");
+            if (m.shard_ivs_b64.empty()) {
+                m.shard_ivs_b64.push_back(*val);
+            }
         } else {
             // Skip unknown value
             skip_ws();
@@ -296,22 +341,42 @@ inline auto Manifest::from_json(const std::string& json) -> std::expected<Manife
 inline auto split_and_encrypt(
     std::span<const uint8_t> data,
     size_t data_shards,
-    size_t parity_shards)
+    size_t parity_shards,
+    std::span<const uint8_t> customer_kek)
     -> std::expected<std::pair<std::vector<Shard>, Manifest>, std::string>
 {
     if (data.empty()) return std::unexpected("Cannot shard empty data");
     if (data_shards == 0 || parity_shards == 0) {
         return std::unexpected("Shard counts must be positive");
     }
+    if (!customer_kek.empty() && customer_kek.size() != 32) {
+        return std::unexpected("Customer KEK must be 32 bytes");
+    }
 
     // Step 1: Compute content hash (SHA-256 of original data)
     std::vector<uint8_t> content_hash = Crypto::sha256(data);
     std::string content_hash_b64 = detail::base64_encode(content_hash);
 
-    // Step 2: Derive AES-256 key from content hash
-    std::array<uint8_t, 32> key = Crypto::derive_key_from_hash(content_hash);
+    // Step 2: Generate random 256-bit DEK (Data Encryption Key) - NOT derived from content hash
+    std::array<uint8_t, 32> dek{};
+    Crypto::random_bytes(dek);
 
-    // Step 3: Split data into data_shards chunks
+    // Step 3: Envelope encrypt DEK with customer KEK (or default master KEK)
+    auto kek = customer_kek.empty() ? detail::default_kek() : [&]() {
+        std::array<uint8_t, 32> k{};
+        std::copy_n(customer_kek.begin(), 32, k.begin());
+        return k;
+    }();
+
+    std::vector<uint8_t> key_iv(12, 0);
+    Crypto::random_bytes(key_iv);
+
+    auto wrapped = Crypto::aes256_gcm_encrypt(kek, key_iv, dek);
+    if (!wrapped.has_value()) {
+        return std::unexpected("DEK envelope encryption failed: " + wrapped.error());
+    }
+
+    // Step 4: Split data into data_shards chunks
     size_t total_shards = data_shards + parity_shards;
     size_t shard_size = (data.size() + data_shards - 1) / data_shards; // ceil
 
@@ -328,7 +393,7 @@ inline auto split_and_encrypt(
         data_shard_bytes[i].assign(begin, end);
     }
 
-    // Step 4: Reed-Solomon encode to get parity shards
+    // Step 5: Reed-Solomon encode to get parity shards
     ReedSolomon rs;
     auto parity = rs.encode(data_shard_bytes, data_shards, parity_shards);
     if (!parity.has_value()) {
@@ -343,28 +408,31 @@ inline auto split_and_encrypt(
     all_shards_before_encryption.insert(all_shards_before_encryption.end(),
         parity->begin(), parity->end());
 
-    // Step 5: Build Merkle tree over all shard bytes (before encryption)
+    // Step 6: Build Merkle tree over all shard bytes (before encryption)
     Merkle::MerkleTree merkle(all_shards_before_encryption);
 
-    // Step 6: Generate common IV and encrypt each shard
-    std::vector<uint8_t> iv(12, 0);
-    Crypto::random_bytes(iv);
-    std::string iv_b64 = detail::base64_encode(iv);
-
+    // Step 7: Encrypt each shard with unique random 12-byte IV and the random DEK
     std::vector<Shard> shards;
     shards.reserve(total_shards);
     std::vector<std::string> shard_hashes_b64;
     shard_hashes_b64.reserve(total_shards);
+    std::vector<std::string> shard_ivs_b64;
+    shard_ivs_b64.reserve(total_shards);
 
     for (size_t i = 0; i < total_shards; ++i) {
         // Hash shard before encryption (for manifest integrity)
         std::vector<uint8_t> shard_hash = Crypto::sha256(all_shards_before_encryption[i]);
         shard_hashes_b64.push_back(detail::base64_encode(shard_hash));
 
+        // Generate fresh, unique IV for this shard
+        std::vector<uint8_t> shard_iv(12, 0);
+        Crypto::random_bytes(shard_iv);
+        shard_ivs_b64.push_back(detail::base64_encode(shard_iv));
+
         // Encrypt
         auto encrypted = Crypto::aes256_gcm_encrypt(
-            std::span<const uint8_t>(key.data(), key.size()),
-            iv,
+            dek,
+            shard_iv,
             all_shards_before_encryption[i]);
         if (!encrypted.has_value()) {
             return std::unexpected("AES encryption failed for shard " + std::to_string(i) + ": " + encrypted.error());
@@ -373,13 +441,13 @@ inline auto split_and_encrypt(
         Shard shard;
         shard.data = std::move(encrypted->first);
         shard.index = i;
-        shard.iv = iv; // Same IV for all (content-addressed)
+        shard.iv = std::move(shard_iv);
         shard.tag = std::move(encrypted->second);
         shard.merkle_proof = {}; // Can be populated on demand from merkle tree
         shards.push_back(std::move(shard));
     }
 
-    // Step 7: Build Manifest
+    // Step 8: Build Manifest
     Manifest manifest;
     manifest.content_hash_b64 = content_hash_b64;
     manifest.original_size = data.size();
@@ -387,34 +455,73 @@ inline auto split_and_encrypt(
     manifest.data_shards = data_shards;
     manifest.parity_shards = parity_shards;
     manifest.shard_hashes_b64 = std::move(shard_hashes_b64);
-    manifest.encryption_iv_b64 = iv_b64;
+    manifest.shard_ivs_b64 = std::move(shard_ivs_b64);
+    manifest.wrapped_key_b64 = detail::base64_encode(wrapped->first);
+    manifest.key_iv_b64 = detail::base64_encode(key_iv);
+    manifest.key_tag_b64 = detail::base64_encode(wrapped->second);
 
     return std::make_pair(std::move(shards), std::move(manifest));
 }
 
 inline auto reconstruct_and_verify(
     std::span<const Shard> shards,
-    const Manifest& manifest)
+    const Manifest& manifest,
+    std::span<const uint8_t> customer_kek)
     -> std::expected<std::vector<uint8_t>, std::string>
 {
     if (shards.size() < manifest.data_shards) {
         return std::unexpected("Need at least " + std::to_string(manifest.data_shards) +
                                " shards, got " + std::to_string(shards.size()));
     }
+    if (!customer_kek.empty() && customer_kek.size() != 32) {
+        return std::unexpected("Customer KEK must be 32 bytes");
+    }
 
-    // Step 1: Decrypt each shard
-    auto key = Crypto::derive_key_from_hash(
-        *detail::base64_decode(manifest.content_hash_b64));
+    // Step 1: Unwrap DEK using KEK
+    auto kek = customer_kek.empty() ? detail::default_kek() : [&]() {
+        std::array<uint8_t, 32> k{};
+        std::copy_n(customer_kek.begin(), 32, k.begin());
+        return k;
+    }();
 
-    auto iv = detail::base64_decode(manifest.encryption_iv_b64);
-    if (!iv.has_value()) return std::unexpected("Invalid IV in manifest: " + iv.error());
+    auto wrapped_key = detail::base64_decode(manifest.wrapped_key_b64);
+    if (!wrapped_key.has_value()) return std::unexpected("Invalid wrapped_key_b64: " + wrapped_key.error());
 
+    auto key_iv = detail::base64_decode(manifest.key_iv_b64);
+    if (!key_iv.has_value()) return std::unexpected("Invalid key_iv_b64: " + key_iv.error());
+
+    auto key_tag = detail::base64_decode(manifest.key_tag_b64);
+    if (!key_tag.has_value()) return std::unexpected("Invalid key_tag_b64: " + key_tag.error());
+
+    auto unwrapped_dek = Crypto::aes256_gcm_decrypt(
+        kek, *key_iv, *wrapped_key, *key_tag);
+    if (!unwrapped_dek.has_value()) {
+        return std::unexpected("Failed to unwrap DEK (invalid customer key or corrupted manifest): " + unwrapped_dek.error());
+    }
+    if (unwrapped_dek->size() != 32) {
+        return std::unexpected("Unwrapped DEK has invalid length: " + std::to_string(unwrapped_dek->size()));
+    }
+
+    // Step 2: Decrypt each shard using unwrapped DEK and per-shard IV
     std::vector<std::vector<uint8_t>> decrypted_shards;
     std::vector<size_t> indices;
     for (const auto& shard : shards) {
+        std::vector<uint8_t> shard_iv;
+        if (!shard.iv.empty()) {
+            shard_iv = shard.iv;
+        } else if (shard.index < manifest.shard_ivs_b64.size()) {
+            auto decoded_iv = detail::base64_decode(manifest.shard_ivs_b64[shard.index]);
+            if (!decoded_iv.has_value()) {
+                return std::unexpected("Invalid shard IV for index " + std::to_string(shard.index) + ": " + decoded_iv.error());
+            }
+            shard_iv = std::move(*decoded_iv);
+        } else {
+            return std::unexpected("Missing IV for shard index " + std::to_string(shard.index));
+        }
+
         auto plaintext = Crypto::aes256_gcm_decrypt(
-            std::span<const uint8_t>(key.data(), key.size()),
-            *iv,
+            *unwrapped_dek,
+            shard_iv,
             shard.data,
             shard.tag);
         if (!plaintext.has_value()) {
@@ -425,14 +532,14 @@ inline auto reconstruct_and_verify(
         indices.push_back(shard.index);
     }
 
-    // Step 2: Reed-Solomon decode
+    // Step 3: Reed-Solomon decode
     ReedSolomon rs;
     auto data_shard_bytes = rs.decode(decrypted_shards, indices, manifest.data_shards);
     if (!data_shard_bytes.has_value()) {
         return std::unexpected("Reed-Solomon decode failed: " + data_shard_bytes.error());
     }
 
-    // Step 3: Reassemble original data
+    // Step 4: Reassemble original data
     std::vector<uint8_t> reconstructed;
     for (const auto& ds : *data_shard_bytes) {
         reconstructed.insert(reconstructed.end(), ds.begin(), ds.end());
@@ -442,7 +549,7 @@ inline auto reconstruct_and_verify(
         reconstructed.resize(manifest.original_size);
     }
 
-    // Step 4: Verify content hash
+    // Step 5: Verify content hash
     std::vector<uint8_t> verify_hash = Crypto::sha256(reconstructed);
     std::string verify_hash_b64 = detail::base64_encode(verify_hash);
     if (verify_hash_b64 != manifest.content_hash_b64) {

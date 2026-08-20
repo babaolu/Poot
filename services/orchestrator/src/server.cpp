@@ -10,6 +10,10 @@
 #include <string>
 #include <thread>
 #include <vector>
+#include <queue>
+#include <condition_variable>
+#include <functional>
+#include <atomic>
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
@@ -140,10 +144,60 @@ namespace json {
     return std::nullopt;
 }
 
+// Lightweight ThreadPool for concurrent connection handling
+class ThreadPool {
+public:
+    explicit ThreadPool(size_t num_threads = 64) {
+        workers_.reserve(num_threads);
+        for (size_t i = 0; i < num_threads; ++i) {
+            workers_.emplace_back([this]() {
+                while (true) {
+                    std::function<void()> task;
+                    {
+                        std::unique_lock<std::mutex> lock(queue_mutex_);
+                        cv_.wait(lock, [this]() { return stop_ || !tasks_.empty(); });
+                        if (stop_ && tasks_.empty()) return;
+                        task = std::move(tasks_.front());
+                        tasks_.pop();
+                    }
+                    task();
+                }
+            });
+        }
+    }
+
+    ~ThreadPool() {
+        {
+            std::unique_lock<std::mutex> lock(queue_mutex_);
+            stop_ = true;
+        }
+        cv_.notify_all();
+        for (auto& w : workers_) {
+            if (w.joinable()) w.join();
+        }
+    }
+
+    void enqueue(std::function<void()> task) {
+        {
+            std::unique_lock<std::mutex> lock(queue_mutex_);
+            if (stop_) return;
+            tasks_.push(std::move(task));
+        }
+        cv_.notify_one();
+    }
+
+private:
+    std::vector<std::thread> workers_;
+    std::queue<std::function<void()>> tasks_;
+    std::mutex queue_mutex_;
+    std::condition_variable cv_;
+    bool stop_ = false;
+};
+
 // The orchestrator server
 class OrchestratorServer {
 public:
-    OrchestratorServer(int port = 8080) : port_(port) {}
+    OrchestratorServer(int port = 8080) : port_(port), pool_(64) {}
 
     auto run() -> bool {
         int server_fd = socket(AF_INET, SOCK_STREAM, 0);
@@ -166,7 +220,7 @@ public:
             return false;
         }
 
-        if (listen(server_fd, 10) < 0) {
+        if (listen(server_fd, 1024) < 0) {
             std::cerr << "Failed to listen" << std::endl;
             close(server_fd);
             return false;
@@ -196,7 +250,7 @@ public:
                         std::cout << "Postgres connected — hydrated " << miners->size()
                                   << " miners from DB.\n";
                     } else {
-                        std::cout << "Postgres connected — min  table not yet created "
+                        std::cout << "Postgres connected — table not yet created "
                                      "(run schema script).\n";
                     }
                 }
@@ -220,8 +274,14 @@ public:
             int client_fd = accept(server_fd, (sockaddr*)&client_addr, &client_len);
             if (client_fd < 0) continue;
 
-            handle_client(client_fd);
-            close(client_fd);
+            timeval tv{5, 0};
+            setsockopt(client_fd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
+            setsockopt(client_fd, SOL_SOCKET, SO_SNDTIMEO, &tv, sizeof(tv));
+
+            pool_.enqueue([this, client_fd]() {
+                handle_client(client_fd);
+                close(client_fd);
+            });
         }
 
         close(server_fd);
@@ -262,7 +322,6 @@ private:
                 resp = HttpResponse{404, "Not Found", "{\"error\":\"Miner not found\"}"};
             }
         } else if (req.method == "POST" && req.path == "/miner/register") {
-            // Parse miner from JSON (simplified)
             Miner m;
             auto id = parse_json_value(req.body, "id");
             if (!id.has_value()) {
@@ -277,8 +336,10 @@ private:
                 auto result = orchestrator_.register_miner(m);
                 if (result.has_value()) {
                     resp.body = "{\"id\":\"" + m.id + "\",\"status\":\"registered\"}";
-                    if (auto pr = pg_store_.insert_miner(m); !pr) {
-                        std::cerr << "Postgres insert_miner failed: " << pr.error() << "\n";
+                    if (pg_store_.is_connected()) {
+                        if (auto pr = pg_store_.insert_miner(m); !pr) {
+                            std::cerr << "Postgres insert_miner failed: " << pr.error() << "\n";
+                        }
                     }
                 } else {
                     resp = HttpResponse{400, "Bad Request", "{\"error\":\"" + result.error() + "\"}"};
@@ -303,9 +364,11 @@ private:
                 auto result = orchestrator_.handle_heartbeat(hb);
                 if (result.has_value()) {
                     resp.body = "{\"accepted\":true}";
-                    if (auto upd_m = orchestrator_.get_miner(hb.miner_id)) {
-                        if (auto pr = pg_store_.update_miner(upd_m->get()); !pr) {
-                            std::cerr << "Postgres update_miner failed: " << pr.error() << "\n";
+                    if (pg_store_.is_connected()) {
+                        if (auto upd_m = orchestrator_.get_miner(hb.miner_id)) {
+                            if (auto pr = pg_store_.update_miner(upd_m->get()); !pr) {
+                                std::cerr << "Postgres update_miner failed: " << pr.error() << "\n";
+                            }
                         }
                     }
                 } else {
@@ -347,9 +410,10 @@ private:
     }
 
     int port_;
-    bool running_ = true;
+    std::atomic<bool> running_ = true;
+    ThreadPool pool_;
     Orchestrator orchestrator_;
-    PostgresStore pg_store_;   // Optional persistence layer
+    PostgresStore pg_store_;
 };
 
 } // namespace Poot::Orchestrator

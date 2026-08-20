@@ -8,6 +8,7 @@
 #include <vector>
 #include <expected>
 #include <chrono>
+#include <mutex>
 
 #include <libpq-fe.h>
 
@@ -50,9 +51,17 @@ public:
     [[nodiscard]] auto mark_offline_if_stale(std::chrono::seconds timeout)
         -> std::expected<std::vector<std::string>, std::string>;
 
+    // --- Parameterized SQL helpers ---
+
+    [[nodiscard]] auto exec_params(const std::string& sql, const std::vector<std::string>& params)
+        -> std::expected<void, std::string>;
+    [[nodiscard]] auto query_params(const std::string& sql, const std::vector<std::string>& params)
+        -> std::expected<std::vector<std::vector<std::string>>, std::string>;
+
 private:
     // PostgreSQL connection handle (extern "C" from libpq)
     PGconn* conn_ = nullptr;
+    mutable std::mutex db_mutex_;
 
     [[nodiscard]] auto exec(const std::string& sql)
         -> std::expected<void, std::string>;

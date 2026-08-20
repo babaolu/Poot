@@ -50,11 +50,13 @@ FILE_BYTES    = FILE_MB * 1024 * 1024
 # ── Import shard engine ────────────────────────────────────────────────────
 
 sys.path.insert(0, str(SCRIPT_DIR))
-from shard_engine import (          # noqa: E402
+from shard_engine_native import (          # noqa: E402
     split_and_encrypt,
     reconstruct_and_verify,
     Shard,
+    Manifest,
     manifest_from_json,
+    manifest_to_json,
 )
 
 # ── Logging helpers ────────────────────────────────────────────────────────
@@ -171,19 +173,11 @@ def step_generate_file() -> tuple[str, int]:
     return file_hash, file_size
 
 
-def step_shard_distribute() -> "Manifest":
-    info("Splitting file into Reed-Solomon shards …")
+def step_shard_distribute() -> Manifest:
+    info("Splitting file into Reed-Solomon shards (Production C++ engine) …")
     data = TEST_FILE.read_bytes()
     shards, manifest = split_and_encrypt(data, DATA_SHARDS, PARITY_SHARDS)
-    MANIFEST_FILE.write_text(json.dumps({
-        "content_hash_b64":  manifest.content_hash_b64,
-        "original_size":     manifest.original_size,
-        "shard_size":        manifest.shard_size,
-        "data_shards":       manifest.data_shards,
-        "parity_shards":     manifest.parity_shards,
-        "encryption_iv_b64": manifest.encryption_iv_b64,
-        "shard_hashes_b64":  manifest.shard_hashes_b64,
-    }, indent=2))
+    MANIFEST_FILE.write_text(manifest_to_json(manifest))
     info(f"  {DATA_SHARDS} data + {PARITY_SHARDS} parity = {len(shards)} shards"
          f"  ({manifest.shard_size} B each)")
 
@@ -194,7 +188,8 @@ def step_shard_distribute() -> "Manifest":
             shard_id  = f"shard-{si:03d}-{r}"
             miner_dir = TEST_DATA_DIR / miner.replace("-", "_")
             miner_dir.mkdir(parents=True, exist_ok=True)
-            (miner_dir / shard_id).write_bytes(sh.data)
+            # Store shard payload (ciphertext + 16-byte authentication tag)
+            (miner_dir / shard_id).write_bytes(sh.data + sh.tag)
     ok(f"Distribution complete  ({len(shards) * REPLICATION} shard copies)")
 
     return manifest

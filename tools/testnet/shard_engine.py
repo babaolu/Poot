@@ -1,13 +1,12 @@
 """
-shard_engine.py — Pure-Python GF(2^8) Reed-Solomon shard engine for the Poot testnet.
-Matches the C++ shard-engine API: split (6 data + 3 parity), reconstruct, verify.
+shard_engine.py — Reference pure-Python GF(2^8) Reed-Solomon implementation.
 
-Depends only on the Python stdlib — no pip install required.
-
-Usage:
-  shards, manifest = split(data, data_shards=6, parity_shards=3)
-  recovered = reconstruct(shards, manifest)      # you only need 6 of 9 shards
-  ok = verify(recovered, manifest)               # SHA-256 content-hash check
+NOTE (FR-TST-1):
+This pure-Python module is maintained solely as a reference, fuzzing, and
+cross-validation tool. It is NOT the production cryptographic engine.
+All automated CI pipeline tests and testnet verification suites MUST use
+`shard_engine_native.py` (which links directly to `libshard-engine.so`)
+to validate the production C++ Reed-Solomon and AES-256-GCM implementation.
 """
 
 from __future__ import annotations

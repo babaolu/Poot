@@ -25,7 +25,7 @@ if (NOT EMSCRIPTEN)
     find_package(OpenSSL REQUIRED)
 endif()
 
-# --- Static library (shared by native and WASM targets) ---
+# --- Static and Shared libraries (native and WASM targets) ---
 add_library(shard-engine-lib STATIC
     src/shard.cpp
 )
@@ -37,6 +37,18 @@ if (EMSCRIPTEN)
     target_compile_options(shard-engine-lib PRIVATE -sUSE_OPENSSL=1)
 else()
     target_link_libraries(shard-engine-lib PUBLIC OpenSSL::Crypto)
+
+    add_library(shard-engine-shared SHARED
+        src/shard.cpp
+    )
+    set_target_properties(shard-engine-shared PROPERTIES
+        OUTPUT_NAME "shard-engine"
+    )
+    target_include_directories(shard-engine-shared PUBLIC
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
+    )
+    target_link_libraries(shard-engine-shared PUBLIC OpenSSL::Crypto)
 endif()
 
 # --- WASM executable (for Emscripten build) ---

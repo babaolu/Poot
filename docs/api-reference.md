@@ -9,9 +9,10 @@ This document describes the HTTP API surface of the Poot Orchestrator.
 The miner API endpoints are implemented natively in the C++ custom HTTP server (`services/orchestrator/src/server.cpp`).
 
 ### 1.1. Orchestrator Health Check
-* **Endpoint**: `GET /health`
-* **Description**: Returns the operational health status of the Orchestrator server.
-* **Response `200 OK`**:
+
+- **Endpoint**: `GET /health`
+- **Description**: Returns the operational health status of the Orchestrator server.
+- **Response `200 OK`**:
   ```json
   {
     "status": "healthy"
@@ -19,30 +20,28 @@ The miner API endpoints are implemented natively in the C++ custom HTTP server (
   ```
 
 ### 1.2. List All Registered Miners
-* **Endpoint**: `GET /miners`
-* **Description**: Returns a JSON array of all registered miner IDs in the network.
-* **Response `200 OK`**:
+
+- **Endpoint**: `GET /miners`
+- **Description**: Returns a JSON array of all registered miner IDs in the network.
+- **Response `200 OK`**:
   ```json
-  [
-    "miner-001",
-    "miner-002"
-  ]
+  ["miner-001", "miner-002"]
   ```
 
 ### 1.3. List Online Miners Only
-* **Endpoint**: `GET /miners/online`
-* **Description**: Returns a JSON array of currently active and online miner IDs.
-* **Response `200 OK`**:
+
+- **Endpoint**: `GET /miners/online`
+- **Description**: Returns a JSON array of currently active and online miner IDs.
+- **Response `200 OK`**:
   ```json
-  [
-    "miner-001"
-  ]
+  ["miner-001"]
   ```
 
 ### 1.4. Get Single Miner Details
-* **Endpoint**: `GET /miner/:id`
-* **Description**: Returns detailed resource, battery, thermal, and network status for a specific miner.
-* **Response `200 OK`**:
+
+- **Endpoint**: `GET /miner/:id`
+- **Description**: Returns detailed resource, battery, thermal, and network status for a specific miner.
+- **Response `200 OK`**:
   ```json
   {
     "id": "miner-001",
@@ -58,7 +57,7 @@ The miner API endpoints are implemented natively in the C++ custom HTTP server (
     "network_type": "wifi"
   }
   ```
-* **Response `404 Not Found`**:
+- **Response `404 Not Found`**:
   ```json
   {
     "error": "Miner not found"
@@ -66,9 +65,10 @@ The miner API endpoints are implemented natively in the C++ custom HTTP server (
   ```
 
 ### 1.5. Register a New Miner
-* **Endpoint**: `POST /miner/register`
-* **Description**: Registers a new mobile miner node in the orchestrator registry.
-* **Payload**:
+
+- **Endpoint**: `POST /miner/register`
+- **Description**: Registers a new mobile miner node in the orchestrator registry.
+- **Payload**:
   ```json
   {
     "id": "miner-001",
@@ -76,7 +76,7 @@ The miner API endpoints are implemented natively in the C++ custom HTTP server (
     "storage_bytes_available": 10737418240
   }
   ```
-* **Response `200 OK`**:
+- **Response `200 OK`**:
   ```json
   {
     "id": "miner-001",
@@ -85,9 +85,10 @@ The miner API endpoints are implemented natively in the C++ custom HTTP server (
   ```
 
 ### 1.6. Miner Heartbeat
-* **Endpoint**: `POST /heartbeat`
-* **Description**: Receives periodic status and resource updates from active miners.
-* **Payload**:
+
+- **Endpoint**: `POST /heartbeat`
+- **Description**: Receives periodic status and resource updates from active miners.
+- **Payload**:
   ```json
   {
     "miner_id": "miner-001",
@@ -97,7 +98,7 @@ The miner API endpoints are implemented natively in the C++ custom HTTP server (
     "network_type": "wifi"
   }
   ```
-* **Response `200 OK`**:
+- **Response `200 OK`**:
   ```json
   {
     "accepted": true
@@ -105,13 +106,12 @@ The miner API endpoints are implemented natively in the C++ custom HTTP server (
   ```
 
 ### 1.7. Check Offline Miners
-* **Endpoint**: `POST /check-offline`
-* **Description**: Manually triggers a stale heartbeat sweep, marking silent miners offline and returning their IDs.
-* **Response `200 OK`**:
+
+- **Endpoint**: `POST /check-offline`
+- **Description**: Manually triggers a stale heartbeat sweep, marking silent miners offline and returning their IDs.
+- **Response `200 OK`**:
   ```json
-  [
-    "miner-002"
-  ]
+  ["miner-002"]
   ```
 
 ---
@@ -121,9 +121,10 @@ The miner API endpoints are implemented natively in the C++ custom HTTP server (
 These endpoints are part of the upcoming deployment layer to be managed by `apps/customer-dashboard` and `services/instance-runner`.
 
 ### 2.1. Deploy Customer Instance
-* **Endpoint**: `POST /instances/deploy`
-* **Description**: Accepts a deployment manifest, initiates file sharding, and instructs the orchestrator to assign shards.
-* **Payload**:
+
+- **Endpoint**: `POST /instances/deploy`
+- **Description**: Accepts a deployment manifest, initiates file sharding, and instructs the orchestrator to assign shards.
+- **Payload**:
   ```json
   {
     "customer_id": "cust-999",
@@ -132,7 +133,7 @@ These endpoints are part of the upcoming deployment layer to be managed by `apps
     "replication_factor": 3
   }
   ```
-* **Response `202 Accepted`**:
+- **Response `202 Accepted`**:
   ```json
   {
     "instance_id": "inst-111",
@@ -146,9 +147,10 @@ These endpoints are part of the upcoming deployment layer to be managed by `apps
   ```
 
 ### 2.2. Get Instance Live Status
-* **Endpoint**: `GET /api/instances/:id`
-* **Description**: Fetches deployment status, replica counts, active storage nodes, and latency metrics.
-* **Response `200 OK`**:
+
+- **Endpoint**: `GET /api/instances/:id`
+- **Description**: Fetches deployment status, replica counts, active storage nodes, and latency metrics.
+- **Response `200 OK`**:
   ```json
   {
     "instance_id": "inst-111",

@@ -97,19 +97,21 @@ const char* shard_get_manifest_json(void* handle) {
     }
 }
 
-// Reconstruct data from shards (any data_shards subset)
+// Reconstruct data from shards with optional explicit auth tags
 // manifest_json: the manifest JSON from shard_get_manifest_json()
 // shard_data_ptrs: array of pointers to shard data bytes
 // shard_lens: array of shard data lengths
+// shard_tag_ptrs: optional array of pointers to 16-byte shard auth tags (can be nullptr)
 // shard_indices: original indices of each shard (0..total-1)
 // shard_count: number of shards provided
 // out_len: set to reconstructed data length on success
 // Returns: pointer to reconstructed data, or nullptr on error
 // Caller must free() the returned pointer
-const uint8_t* shard_reconstruct(
+const uint8_t* shard_reconstruct_with_tags(
     const char* manifest_json,
     const uint8_t** shard_data_ptrs,
     const size_t* shard_lens,
+    const uint8_t** shard_tag_ptrs,
     const size_t* shard_indices,
     size_t shard_count,
     size_t* out_len) {
@@ -125,21 +127,50 @@ const uint8_t* shard_reconstruct(
         // Build shard vector
         std::vector<Shard> shards(shard_count);
         for (size_t i = 0; i < shard_count; ++i) {
-            shards[i].data.assign(shard_data_ptrs[i], shard_data_ptrs[i] + shard_lens[i]);
             shards[i].index = shard_indices[i];
-            // IV and tag would need to be provided separately in a real API
+
+            if (shard_tag_ptrs && shard_tag_ptrs[i]) {
+                shards[i].data.assign(shard_data_ptrs[i], shard_data_ptrs[i] + shard_lens[i]);
+                shards[i].tag.assign(shard_tag_ptrs[i], shard_tag_ptrs[i] + 16);
+            } else if (shard_lens[i] > 16 && shard_lens[i] > manifest.shard_size) {
+                // If tag is appended to shard data (ciphertext + 16-byte tag)
+                size_t cipher_len = shard_lens[i] - 16;
+                shards[i].data.assign(shard_data_ptrs[i], shard_data_ptrs[i] + cipher_len);
+                shards[i].tag.assign(shard_data_ptrs[i] + cipher_len, shard_data_ptrs[i] + shard_lens[i]);
+            } else {
+                shards[i].data.assign(shard_data_ptrs[i], shard_data_ptrs[i] + shard_lens[i]);
+            }
         }
 
         auto result = reconstruct_and_verify(shards, manifest);
         if (!result.has_value()) return nullptr;
 
-        auto* handle = new ShardHandle();
-        handle->reconstructed = std::move(*result);
-        if (out_len) *out_len = handle->reconstructed.size();
-        return static_cast<const uint8_t*>(handle->reconstructed.data());
+        uint8_t* buf = static_cast<uint8_t*>(malloc(result->size()));
+        if (!buf) return nullptr;
+        std::memcpy(buf, result->data(), result->size());
+        if (out_len) *out_len = result->size();
+        return buf;
     } catch (...) {
         return nullptr;
     }
+}
+
+// Reconstruct data from shards (legacy C ABI signature)
+const uint8_t* shard_reconstruct(
+    const char* manifest_json,
+    const uint8_t** shard_data_ptrs,
+    const size_t* shard_lens,
+    const size_t* shard_indices,
+    size_t shard_count,
+    size_t* out_len) {
+    return shard_reconstruct_with_tags(
+        manifest_json,
+        shard_data_ptrs,
+        shard_lens,
+        nullptr,
+        shard_indices,
+        shard_count,
+        out_len);
 }
 
 // Free handle and all associated memory
@@ -151,6 +182,11 @@ void shard_free(void* handle) {
 // Free a string returned by shard_get_manifest_json()
 void shard_free_string(const char* s) {
     free(const_cast<char*>(s));
+}
+
+// Free data returned by shard_reconstruct() or shard_reconstruct_with_tags()
+void shard_free_data(const uint8_t* p) {
+    free(const_cast<uint8_t*>(p));
 }
 
 } // extern "C"

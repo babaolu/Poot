@@ -122,6 +122,7 @@ auto PostgresStore::connect(const std::string& conninfo)
 auto PostgresStore::exec(const std::string& sql)
     -> std::expected<void, std::string>
 {
+    std::lock_guard<std::mutex> lock(db_mutex_);
     if (!conn_) return std::unexpected("Not connected");
     PGresult* r = PQexec(conn_, sql.c_str());
     if (PQresultStatus(r) != PGRES_COMMAND_OK) {
@@ -136,8 +137,88 @@ auto PostgresStore::exec(const std::string& sql)
 auto PostgresStore::query(const std::string& sql)
     -> std::expected<std::vector<std::vector<std::string>>, std::string>
 {
+    std::lock_guard<std::mutex> lock(db_mutex_);
     if (!conn_) return std::unexpected("Not connected");
     PGresult* r = PQexec(conn_, sql.c_str());
+    if (PQresultStatus(r) != PGRES_TUPLES_OK) {
+        std::string err = pq_error(conn_);
+        finish(r);
+        return std::unexpected("Query error: " + err);
+    }
+
+    int rows = PQntuples(r);
+    int cols = PQnfields(r);
+    std::vector<std::vector<std::string>> out;
+    out.reserve(rows);
+
+    for (int i = 0; i < rows; ++i) {
+        std::vector<std::string> row;
+        row.reserve(cols);
+        for (int j = 0; j < cols; ++j) {
+            const char* v = PQgetvalue(r, i, j);
+            row.push_back(v ? v : "");
+        }
+        out.push_back(std::move(row));
+    }
+    finish(r);
+    return out;
+}
+
+auto PostgresStore::exec_params(const std::string& sql, const std::vector<std::string>& params)
+    -> std::expected<void, std::string>
+{
+    std::lock_guard<std::mutex> lock(db_mutex_);
+    if (!conn_) return std::unexpected("Not connected");
+
+    std::vector<const char*> param_values;
+    param_values.reserve(params.size());
+    for (const auto& p : params) {
+        param_values.push_back(p.c_str());
+    }
+
+    PGresult* r = PQexecParams(
+        conn_,
+        sql.c_str(),
+        static_cast<int>(params.size()),
+        nullptr,
+        param_values.empty() ? nullptr : param_values.data(),
+        nullptr,
+        nullptr,
+        0
+    );
+
+    if (PQresultStatus(r) != PGRES_COMMAND_OK) {
+        std::string err = pq_error(conn_);
+        finish(r);
+        return std::unexpected("SQL error: " + err + " | SQL: " + sql);
+    }
+    finish(r);
+    return {};
+}
+
+auto PostgresStore::query_params(const std::string& sql, const std::vector<std::string>& params)
+    -> std::expected<std::vector<std::vector<std::string>>, std::string>
+{
+    std::lock_guard<std::mutex> lock(db_mutex_);
+    if (!conn_) return std::unexpected("Not connected");
+
+    std::vector<const char*> param_values;
+    param_values.reserve(params.size());
+    for (const auto& p : params) {
+        param_values.push_back(p.c_str());
+    }
+
+    PGresult* r = PQexecParams(
+        conn_,
+        sql.c_str(),
+        static_cast<int>(params.size()),
+        nullptr,
+        param_values.empty() ? nullptr : param_values.data(),
+        nullptr,
+        nullptr,
+        0
+    );
+
     if (PQresultStatus(r) != PGRES_TUPLES_OK) {
         std::string err = pq_error(conn_);
         finish(r);
@@ -204,10 +285,9 @@ namespace {
     else if (st == "degraded") m.status = MinerStatus::Degraded;
     else                  m.status = MinerStatus::Offline;
     // last_heartbeat returned as ISO string → chrono
-    // (simplified: store as epoch seconds)
     m.uptime_percentage     = static_cast<uint32_t>(std::stoul(r[12]));
     m.reputation_score      = static_cast<uint32_t>(std::stoul(r[13]));
-    m.is_charging           = r[14] == "t";
+    m.is_charging           = (r[14] == "t" || r[14] == "true");
     m.battery_percent       = static_cast<int>(std::stoi(r[15]));
     m.cpu_usage_percent     = std::stof(r[16]);
     m.thermal_state         = r[17];
@@ -229,38 +309,28 @@ auto PostgresStore::insert_miner(const Miner& miner)
         "        $11, now(), $12, $13, $14, $15, $16, $17, $18) "
         "ON CONFLICT (id) DO NOTHING";
 
-    // libpq doesn't support $n > 65535; format directly for simplicity
-    std::ostringstream ss;
-    ss << "INSERT INTO miners (id, wallet_address, country, region, latitude, longitude, "
-          "storage_bytes_avail, storage_bytes_used, compute_units_avail, compute_units_used, "
-          "status, last_heartbeat, uptime_pct, reputation_score, is_charging, "
-          "battery_pct, cpu_pct, thermal_state, network_type) "
-          "VALUES ('"
-       << PQescapeLiteral(conn_, miner.id.c_str(), static_cast<int>(miner.id.size()))
-       << "', '"
-       << PQescapeLiteral(conn_, miner.wallet_address.c_str(), static_cast<int>(miner.wallet_address.size()))
-       << "', '"
-       << PQescapeLiteral(conn_, miner.location.country.c_str(), static_cast<int>(miner.location.country.size()))
-       << "', '"
-       << PQescapeLiteral(conn_, miner.location.region.c_str(), static_cast<int>(miner.location.region.size()))
-       << "', "
-       << std::fixed << std::setprecision(6) << miner.location.latitude << ", "
-       << std::fixed << std::setprecision(6) << miner.location.longitude << ", "
-       << static_cast<uint64_t>(miner.storage_bytes_available) << ", "
-       << static_cast<uint64_t>(miner.storage_bytes_used) << ", "
-       << miner.compute_units_available << ", "
-       << miner.compute_units_used << ", '"
-       << miner_status_str(miner.status) << "', now(), "
-       << miner.uptime_percentage << ", "
-       << miner.reputation_score << ", "
-       << (miner.is_charging ? "TRUE" : "FALSE") << ", "
-       << miner.battery_percent << ", "
-       << std::fixed << std::setprecision(1) << miner.cpu_usage_percent << ", '"
-       << miner.thermal_state << "', '"
-       << miner.network_type << "') "
-          "ON CONFLICT (id) DO NOTHING";
+    std::vector<std::string> params = {
+        miner.id,
+        miner.wallet_address,
+        miner.location.country,
+        miner.location.region,
+        std::to_string(miner.location.latitude),
+        std::to_string(miner.location.longitude),
+        std::to_string(miner.storage_bytes_available),
+        std::to_string(miner.storage_bytes_used),
+        std::to_string(miner.compute_units_available),
+        std::to_string(miner.compute_units_used),
+        miner_status_str(miner.status),
+        std::to_string(miner.uptime_percentage),
+        std::to_string(miner.reputation_score),
+        miner.is_charging ? "true" : "false",
+        std::to_string(miner.battery_percent),
+        std::to_string(miner.cpu_usage_percent),
+        miner.thermal_state,
+        miner.network_type
+    };
 
-    return exec(ss.str());
+    return exec_params(sql, params);
 }
 
 auto PostgresStore::update_miner(const Miner& miner)
@@ -274,7 +344,21 @@ auto PostgresStore::update_miner(const Miner& miner)
         "  thermal_state=$8, network_type=$9, reputation_score=$10 "
         "WHERE id=$11";
 
-    return exec(sql);
+    std::vector<std::string> params = {
+        miner.wallet_address,
+        miner_status_str(miner.status),
+        std::to_string(miner.storage_bytes_available),
+        std::to_string(miner.storage_bytes_used),
+        miner.is_charging ? "true" : "false",
+        std::to_string(miner.battery_percent),
+        std::to_string(miner.cpu_usage_percent),
+        miner.thermal_state,
+        miner.network_type,
+        std::to_string(miner.reputation_score),
+        miner.id
+    };
+
+    return exec_params(sql, params);
 }
 
 auto PostgresStore::load_miners()
@@ -302,14 +386,23 @@ auto PostgresStore::load_miners()
 auto PostgresStore::insert_assignment(const ShardAssignment& a)
     -> std::expected<void, std::string>
 {
-    namespace cr = std::chrono;
     auto ts = epoch_iso(a.assigned_at);
 
     std::string sql =
         "INSERT INTO shard_assignments (shard_id, miner_id, customer_id, "
         "                                 replication_factor, assigned_at, verified) "
         "VALUES ($1, $2, $3, $4, $5::timestamptz, $6)";
-    return exec(sql);
+
+    std::vector<std::string> params = {
+        a.shard_id,
+        a.miner_id,
+        a.customer_id,
+        std::to_string(a.replication_factor),
+        ts,
+        a.verified ? "true" : "false"
+    };
+
+    return exec_params(sql, params);
 }
 
 auto PostgresStore::load_assignments()
@@ -321,26 +414,39 @@ auto PostgresStore::load_assignments()
     );
     if (!result) return std::unexpected(result.error());
 
-    // Simplified — full implementation would parse timestamptz rows into
-    // ShardAssignment structs.  This stub returns the raw vec; the Orchestrator
-    // layer can populate structures from it.
-    return std::vector<ShardAssignment>{};
+    std::vector<ShardAssignment> assignments;
+    assignments.reserve(result->size());
+    for (const auto& row : *result) {
+        if (row.size() >= 6) {
+            ShardAssignment a;
+            a.shard_id = row[0];
+            a.miner_id = row[1];
+            a.customer_id = row[2];
+            a.replication_factor = static_cast<size_t>(std::stoul(row[3]));
+            a.assigned_at = std::chrono::system_clock::now();
+            a.verified = (row[5] == "t" || row[5] == "true");
+            assignments.push_back(std::move(a));
+        }
+    }
+    return assignments;
 }
 
 // ── Offline detection ──────────────────────────────────────────────────────
 
-auto PostgresStore::mark_offline_if_stale(std::chrono::seconds)
+auto PostgresStore::mark_offline_if_stale(std::chrono::seconds timeout)
     -> std::expected<std::vector<std::string>, std::string>
 {
-    // Updates miner status to 'offline' where last_heartbeat is older than
-    // `timeout` seconds and the miner is not already offline.
-    // Returns the IDs that were marked offline.
-    auto result = query(
+    std::string sql =
         "UPDATE miners SET status='offline' "
         "WHERE status != 'offline' "
         "  AND now() - last_heartbeat > ($1 || ' seconds')::interval "
-        "RETURNING id"
-    );
+        "RETURNING id";
+
+    std::vector<std::string> params = {
+        std::to_string(timeout.count())
+    };
+
+    auto result = query_params(sql, params);
     if (!result) return std::unexpected(result.error());
 
     std::vector<std::string> ids;

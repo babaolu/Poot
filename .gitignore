@@ -52,6 +52,12 @@ apps/miner-app/ios/Pods/
 # Misc
 *.tgz
 .nvmrc
+__pycache__/
+*.pyc
+graphify-out/
+tools/testnet/test_data/
+tools/testnet/test_result.txt
+tools/testnet/fail_reason.txt
 # Build prompt files (keep local only for reference)
 CLOUDMINE_BUILD_PROMPT.md
 POOT_BUILD_PROMPT.md
